@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Invoice & Bill Extractor</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-area">
+        <div class="logo-badge">🧾</div>
+        <div>
+          <h1>Invoice & Bill Data Extractor</h1>
+          <p class="subtitle">Extract clean accounting data from paper receipts & PDF bills with anti-hallucination math validation</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="pill pill-ocr" id="ocr-status-pill">OCR Engine: Ready</span>
+        <span class="pill pill-llm">OpenRouter AI</span>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <div class="main-layout">
+      <!-- Left Column: Settings & Upload -->
+      <section class="card upload-section">
+        <h2 class="section-title">1. Upload Bill or Receipt</h2>
+        
+        <!-- OpenRouter Settings Accordion -->
+        <details class="settings-drawer" open>
+          <summary>⚙️ AI & Model Settings</summary>
+          <div class="settings-body">
+            <div class="form-group">
+              <label for="model-select">OpenRouter Model</label>
+              <select id="model-select" class="form-input">
+                <option value="google/gemini-2.0-flash-001" selected>Google Gemini 2.0 Flash (Fast & Highly Accurate)</option>
+                <option value="anthropic/claude-3.5-haiku">Claude 3.5 Haiku (Precision Extraction)</option>
+                <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini (Cost Effective)</option>
+                <option value="deepseek/deepseek-chat">DeepSeek V3 (Reasoning & Structured Data)</option>
+                <option value="meta-llama/llama-3.3-70b-instruct">Meta Llama 3.3 70B</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="api-key-input">OpenRouter API Key (Optional Override)</label>
+              <input type="password" id="api-key-input" class="form-input" placeholder="sk-or-v1-... (leave blank to use server .env)">
+              <small class="helper-text">Key is kept in-memory for this session only.</small>
+            </div>
+          </div>
+        </details>
+
+        <!-- Drag & Drop Dropzone -->
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff" hidden>
+          <div class="dropzone-content">
+            <div class="upload-icon">📂</div>
+            <h3>Drag & Drop your invoice here</h3>
+            <p>Supports <strong>PDF, PNG, JPG, JPEG, WebP</strong> (Max 15MB)</p>
+            <button type="button" class="btn btn-secondary" id="browse-btn">Browse File</button>
+          </div>
+          <div class="file-preview-indicator" id="file-indicator" style="display: none;">
+            <span class="file-name" id="file-name">invoice.pdf</span>
+            <span class="file-size" id="file-size">1.2 MB</span>
+            <button type="button" class="btn-remove" id="remove-file-btn">✕</button>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-block" id="process-btn" disabled>
+          <span class="btn-text">Extract & Validate Data</span>
+          <span class="spinner" id="btn-spinner" style="display: none;"></span>
+        </button>
+
+        <!-- Sample Loaders -->
+        <div class="sample-loader">
+          <span>Or try with test sample:</span>
+          <div class="sample-buttons">
+            <button type="button" class="btn-chip" id="load-sample-valid">Standard Bill (Valid Math)</button>
+            <button type="button" class="btn-chip" id="load-sample-mismatch">Tampered Bill (Mismatch)</button>
+          </div>
+        </div>
+
+        <!-- Processing Step indicator -->
+        <div class="step-progress" id="step-progress" style="display: none;">
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          <div class="step-label" id="step-label">Reading document via OCR...</div>
+        </div>
+      </section>
+
+      <!-- Right Column: Results & Validation -->
+      <section class="card results-section">
+        <div class="results-header">
+          <h2 class="section-title">2. Extracted Data & Validation</h2>
+          <div class="action-buttons" id="export-buttons" style="display: none;">
+            <button type="button" class="btn btn-outline" id="download-csv-btn">📥 CSV</button>
+            <button type="button" class="btn btn-outline" id="download-excel-btn">📊 Excel (.xlsx)</button>
+            <button type="button" class="btn btn-outline" id="copy-json-btn">📋 Copy JSON</button>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">📊</div>
+          <h3>No invoice processed yet</h3>
+          <p>Upload a bill or click one of the test samples to view line items, totals, and arithmetic anti-hallucination verification.</p>
+        </div>
+
+        <!-- Content State (Initially hidden) -->
+        <div class="results-content" id="results-content" style="display: none;">
+          
+          <!-- Validation Banner -->
+          <div class="validation-banner" id="validation-banner">
+            <div class="val-icon" id="val-icon">✅</div>
+            <div class="val-details">
+              <h4 id="val-title">Validation Status</h4>
+              <p id="val-explanation">Detailed arithmetic check</p>
+              <div id="val-flags" class="val-flags-list"></div>
+            </div>
+          </div>
+
+          <!-- Metadata Grid -->
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Vendor</span>
+              <span class="meta-value" id="val-vendor">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Invoice #</span>
+              <span class="meta-value" id="val-invoice-no">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Date</span>
+              <span class="meta-value" id="val-date">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Tax ID / GSTIN</span>
+              <span class="meta-value" id="val-tax-id">-</span>
+            </div>
+          </div>
+
+          <!-- Items Table -->
+          <div class="table-container">
+            <table class="items-table" id="items-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Description</th>
+                  <th class="text-right">Qty</th>
+                  <th class="text-right">Unit Price</th>
+                  <th class="text-right">Total</th>
+                  <th class="text-center">Math Check</th>
+                </tr>
+              </thead>
+              <tbody id="items-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Financial Breakdown Summary -->
+          <div class="financials-card">
+            <div class="fin-row">
+              <span>Items Subtotal:</span>
+              <span id="fin-subtotal">$0.00</span>
+            </div>
+            <div class="fin-row">
+              <span>Tax (<span id="fin-tax-rate">0%</span>):</span>
+              <span id="fin-tax">$0.00</span>
+            </div>
+            <div class="fin-row">
+              <span>Discount / Deduction:</span>
+              <span id="fin-discount">-$0.00</span>
+            </div>
+            <div class="fin-row">
+              <span>Shipping / Freight:</span>
+              <span id="fin-shipping">$0.00</span>
+            </div>
+            <div class="fin-divider"></div>
+            <div class="fin-row fin-grand-total">
+              <span>Grand Total:</span>
+              <span id="fin-grand-total">$0.00</span>
+            </div>
+          </div>
+
+          <!-- Collapsible Raw OCR View -->
+          <details class="ocr-drawer">
+            <summary>🔍 View Raw OCR Text & Processing Metrics</summary>
+            <div class="ocr-drawer-body">
+              <div class="metrics-bar">
+                <span>OCR Engine: <b id="metric-ocr">-</b></span>
+                <span>Model: <b id="metric-model">-</b></span>
+                <span>Speed: <b id="metric-speed">-</b></span>
+              </div>
+              <pre id="raw-ocr-display" class="code-block"></pre>
+            </div>
+          </details>
+
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

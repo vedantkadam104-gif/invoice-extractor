@@ -1,0 +1,29 @@
+# Environment variables (CRITICAL: NEVER COMMIT YOUR API KEY)
+.env
+*.env.local
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# EasyOCR downloaded model weights (large binary files)
+models/
+.EasyOCR/
+
+# Python cache & build files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary test / debug scripts
+debug_*.py
