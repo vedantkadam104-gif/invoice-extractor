@@ -1,6 +1,6 @@
 """
-app.py — Modern SaaS Dashboard for Invoice / Bill Data Extractor
-Styled after modern enterprise SaaS analytics dashboards.
+app.py — LedgerAI: Intelligent Invoice & Bill Data Extractor
+Custom modern dark theme with high-contrast typography, interactive inspection, and instant exports.
 """
 
 from __future__ import annotations
@@ -9,7 +9,6 @@ import datetime
 import os
 import io
 
-import altair as alt
 import httpx
 import pandas as pd
 import streamlit as st
@@ -21,293 +20,289 @@ API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # ── Page Configuration ────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="BillExtract — AI Invoice Analytics",
-    page_icon="⚡",
+    page_title="LedgerAI — Invoice Extractor",
+    page_icon="🧾",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# ── Custom CSS: Modern SaaS Dashboard Theme ───────────────────────────────────
+# ── Clean, High-Contrast Modern Dark Theme CSS ────────────────────────────────
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-    /* Global Typography & Canvas */
+    /* Global canvas & background */
     html, body, [class*="css"], .stApp {
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        background-color: #E2E8F0 !important;
-        color: #1E293B;
+        background-color: #080C14 !important;
+        color: #E2E8F0 !important;
     }
 
-    /* Outer Wrapper / Canvas Frame */
+    /* Container constraints */
     .block-container {
-        max-width: 1380px !important;
-        padding-top: 1.5rem !important;
-        padding-bottom: 3rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
+        max-width: 1320px !important;
+        padding-top: 1.8rem !important;
+        padding-bottom: 3.5rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
     }
 
-    /* Main Dashboard Sheet */
-    .dashboard-canvas {
-        background: #FFFFFF;
-        border-radius: 24px;
-        box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(15, 23, 42, 0.05);
-        padding: 0;
-        overflow: hidden;
-        margin-bottom: 1.5rem;
-    }
-
-    /* ─── Top Navbar ────────────────────────────────────────────────────────── */
-    .top-navbar {
-        background: #0B132B;
-        padding: 1rem 2rem;
+    /* ─── Top App Header Bar ─────────────────────────────────────────────── */
+    .app-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-top-left-radius: 24px;
-        border-top-right-radius: 24px;
+        padding: 1.2rem 1.8rem;
+        background: #0E1526;
+        border: 1px solid #1E293B;
+        border-radius: 16px;
+        margin-bottom: 1.8rem;
+        box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
     }
-    .brand-logo {
+    .brand-section {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
-        color: #FFFFFF;
-        font-weight: 800;
-        font-size: 1.35rem;
-        letter-spacing: -0.02em;
+        gap: 0.8rem;
     }
-    .brand-logo span.accent {
-        color: #F59E0B;
-    }
-    .nav-pills {
-        display: flex;
-        gap: 0.5rem;
-        background: rgba(255, 255, 255, 0.07);
-        padding: 0.25rem 0.4rem;
-        border-radius: 9999px;
-    }
-    .nav-pill {
-        color: #94A3B8;
-        padding: 0.4rem 1.1rem;
-        border-radius: 9999px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-    .nav-pill.active {
-        background: #1C2541;
-        color: #FFFFFF;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-    .nav-right {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-    .user-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #F59E0B, #D97706);
-        color: #FFFFFF;
+    .brand-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #3B82F6, #1D4ED8);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 700;
-        font-size: 0.85rem;
-        border: 2px solid rgba(255, 255, 255, 0.2);
+        font-size: 1.3rem;
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
     }
-
-    /* ─── Greeting / Sub-header ─────────────────────────────────────────────── */
-    .greeting-bar {
-        background: #0B132B;
-        padding: 0.8rem 2rem 2.2rem 2rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        color: #FFFFFF;
-    }
-    .greeting-text h2 {
-        font-size: 1.6rem;
-        font-weight: 700;
+    .brand-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #F8FAFC;
+        letter-spacing: -0.02em;
         margin: 0;
-        color: #FFFFFF;
     }
-    .greeting-text p {
-        font-size: 0.88rem;
-        color: #94A3B8;
-        margin: 0.2rem 0 0 0;
+    .brand-subtitle {
+        font-size: 0.8rem;
+        color: #64748B;
+        margin-top: 0.1rem;
+    }
+    .header-badges {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+    }
+    .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.85rem;
+        border-radius: 9999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border: 1px solid;
+    }
+    .badge-pill.status {
+        background: rgba(16, 185, 129, 0.1);
+        color: #34D399;
+        border-color: rgba(16, 185, 129, 0.3);
+    }
+    .badge-pill.model {
+        background: rgba(59, 130, 246, 0.1);
+        color: #60A5FA;
+        border-color: rgba(59, 130, 246, 0.3);
     }
 
-    /* ─── Metric Cards Grid ─────────────────────────────────────────────────── */
-    .metric-card {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
+    /* ─── Cards & Panels ─────────────────────────────────────────────────── */
+    .card-panel {
+        background: #0E1526;
+        border: 1px solid #1E293B;
         border-radius: 18px;
-        padding: 1.4rem 1.3rem;
-        box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.04);
-        transition: transform 0.2s, box-shadow 0.2s;
-        height: 100%;
+        padding: 1.6rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
     }
-    .metric-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px -3px rgba(15, 23, 42, 0.08);
+    .card-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #F8FAFC;
+        margin-bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
-    .metric-card.highlight {
-        background: #0B132B;
-        color: #FFFFFF;
-        border-color: #1E293B;
+    .card-desc {
+        font-size: 0.82rem;
+        color: #64748B;
+        margin-bottom: 1.2rem;
     }
-    .metric-card.highlight .metric-title {
-        color: #94A3B8;
+
+    /* ─── Metric Box Components ─────────────────────────────────────────── */
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.2rem;
     }
-    .metric-card.highlight .metric-num {
-        color: #FFFFFF;
+    .metric-item {
+        background: #141D32;
+        border: 1px solid #1E2D4A;
+        border-radius: 14px;
+        padding: 1.1rem;
     }
-    .metric-title {
-        font-size: 0.8rem;
+    .metric-label {
+        font-size: 0.72rem;
         font-weight: 600;
         color: #64748B;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 0.5rem;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.35rem;
     }
-    .metric-num {
-        font-size: 1.85rem;
-        font-weight: 800;
-        color: #0F172A;
-        letter-spacing: -0.02em;
-        margin-bottom: 0.4rem;
-    }
-    .metric-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        font-size: 0.75rem;
+    .metric-val {
+        font-size: 1.25rem;
         font-weight: 700;
-        padding: 0.2rem 0.6rem;
-        border-radius: 9999px;
+        color: #F1F5F9;
+        word-break: break-word;
     }
-    .metric-pill.positive {
-        background: rgba(16, 185, 129, 0.15);
-        color: #10B981;
+    .metric-val.green {
+        color: #10B981 !important;
+        font-size: 1.5rem !important;
+        font-weight: 800 !important;
     }
-    .metric-pill.negative {
-        background: rgba(239, 68, 68, 0.15);
-        color: #EF4444;
-    }
-    .metric-pill.neutral {
-        background: rgba(100, 116, 139, 0.12);
-        color: #64748B;
+    .metric-val.blue {
+        color: #38BDF8 !important;
     }
 
-    /* ─── Content Panel Cards ───────────────────────────────────────────────── */
-    .content-panel {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 20px;
-        padding: 1.6rem;
-        box-shadow: 0 4px 14px -3px rgba(15, 23, 42, 0.04);
-        margin-bottom: 1.5rem;
-    }
-    .panel-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+    /* ─── Custom Clean HTML Table for Items ──────────────────────────────── */
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+        color: #E2E8F0;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #1E293B;
         margin-bottom: 1.2rem;
     }
-    .panel-title {
-        font-size: 1.15rem;
-        font-weight: 700;
-        color: #0F172A;
-        margin: 0;
+    .custom-table thead {
+        background: #162238;
     }
-    .panel-subtitle {
-        font-size: 0.8rem;
-        color: #64748B;
-        margin-top: 0.15rem;
+    .custom-table th {
+        padding: 0.85rem 1.1rem;
+        font-weight: 600;
+        color: #94A3B8;
+        text-align: left;
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #1E293B;
+    }
+    .custom-table th.num {
+        text-align: right;
+    }
+    .custom-table td {
+        padding: 0.85rem 1.1rem;
+        border-bottom: 1px solid #162033;
+        background: #0E1526;
+    }
+    .custom-table tr:last-child td {
+        border-bottom: none;
+    }
+    .custom-table tr:hover td {
+        background: #131E33;
+    }
+    .custom-table td.num {
+        text-align: right;
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 500;
+    }
+    .custom-table td.bold {
+        font-weight: 600;
+        color: #F8FAFC;
     }
 
-    /* ─── Modern Upload Dropzone ────────────────────────────────────────────── */
+    /* ─── Validation Status Banner ──────────────────────────────────────── */
+    .validation-badge-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.9rem 1.2rem;
+        border-radius: 12px;
+        margin-bottom: 1.2rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+    }
+    .validation-badge-banner.valid {
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        color: #34D399;
+    }
+    .validation-badge-banner.flagged {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        color: #F87171;
+    }
+
+    /* ─── Upload Dropzone Customization ──────────────────────────────────── */
     [data-testid="stFileUploadDropzone"] {
-        background: #F8FAFC !important;
-        border: 2px dashed #CBD5E1 !important;
+        background: #0B111E !important;
+        border: 2px dashed #1E293B !important;
         border-radius: 16px !important;
-        padding: 1.5rem !important;
-        transition: border-color 0.2s, background-color 0.2s;
+        padding: 2rem !important;
+        transition: all 0.2s;
     }
     [data-testid="stFileUploadDropzone"]:hover {
-        border-color: #F59E0B !important;
-        background: #FFFBEB !important;
+        border-color: #3B82F6 !important;
+        background: #0E1729 !important;
+    }
+    [data-testid="stFileUploadDropzone"] svg {
+        fill: #3B82F6 !important;
     }
 
-    /* ─── Action Buttons ────────────────────────────────────────────────────── */
+    /* ─── Streamlit UI Button Overrides ──────────────────────────────────── */
     .stButton > button[kind="primary"] {
-        background: #F59E0B !important;
-        color: #0B132B !important;
+        background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%) !important;
+        color: #FFFFFF !important;
         border: none !important;
         border-radius: 12px !important;
         font-weight: 700 !important;
-        padding: 0.6rem 1.6rem !important;
+        padding: 0.75rem 1.8rem !important;
         font-size: 0.95rem !important;
-        box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35) !important;
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4) !important;
         transition: all 0.2s !important;
     }
     .stButton > button[kind="primary"]:hover {
-        background: #D97706 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6) !important;
     }
 
     .stDownloadButton > button {
-        background: #F1F5F9 !important;
-        color: #0F172A !important;
-        border: 1px solid #E2E8F0 !important;
+        background: #141D32 !important;
+        color: #F1F5F9 !important;
+        border: 1px solid #243452 !important;
         border-radius: 12px !important;
         font-weight: 600 !important;
-        padding: 0.6rem 1.2rem !important;
+        padding: 0.7rem 1.4rem !important;
         font-size: 0.88rem !important;
         transition: all 0.2s !important;
     }
     .stDownloadButton > button:hover {
-        background: #E2E8F0 !important;
-        border-color: #CBD5E1 !important;
+        background: #1A2642 !important;
+        border-color: #3B82F6 !important;
+        color: #FFFFFF !important;
         transform: translateY(-1px) !important;
     }
 
-    /* Status Badges */
-    .status-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: capitalize;
-    }
-    .status-badge.booked {
-        background: #ECFDF5;
-        color: #059669;
-    }
-    .status-badge.pending {
-        background: #FFFBEB;
-        color: #D97706;
-    }
-    .status-badge.flagged {
-        background: #FEF2F2;
-        color: #DC2626;
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background-color: #0E1526 !important;
+        border: 1px solid #1E293B !important;
+        border-radius: 12px !important;
+        color: #94A3B8 !important;
     }
 
-    /* Clean Table Styling */
-    div[data-testid="stDataFrame"] {
-        border: 1px solid #F1F5F9;
-        border-radius: 14px;
-        overflow: hidden;
-    }
-
-    /* Hide standard Streamlit header elements */
+    /* Hide standard headers */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -316,415 +311,302 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Initialize Session State for History & Analytics ───────────────────────────
-if "history" not in st.session_state:
-    st.session_state["history"] = [
-        {"vendor": "Alex Fisher", "date": "2026-10-14", "total": 255.00, "status": "Valid", "items_count": 2},
-        {"vendor": "Anna Baker", "date": "2026-10-18", "total": 500.00, "status": "Valid", "items_count": 1},
-        {"vendor": "Global Logistics", "date": "2026-10-24", "total": 755.00, "status": "Valid", "items_count": 3},
-    ]
-
-# ── TOP NAVBAR & GREETING BANNER ──────────────────────────────────────────────
+# ── TOP APP BAR ───────────────────────────────────────────────────────────────
 today_str = datetime.date.today().strftime("%B %d, %Y")
 
 st.markdown(
     f"""
-    <div class="dashboard-canvas">
-        <div class="top-navbar">
-            <div class="brand-logo">
-                ⚡ BillExtract <span class="accent">AI</span>
-            </div>
-            <div class="nav-pills">
-                <span class="nav-pill active">Dashboard</span>
-                <span class="nav-pill">Invoices</span>
-                <span class="nav-pill">Analytics</span>
-                <span class="nav-pill">Settings</span>
-            </div>
-            <div class="nav-right">
-                <div style="color:#94A3B8; font-size:0.9rem; cursor:pointer;">🔍</div>
-                <div style="color:#94A3B8; font-size:0.9rem; position:relative; cursor:pointer;">
-                    🔔<span style="position:absolute; top:-2px; right:-2px; width:7px; height:7px; background:#EF4444; border-radius:50%;"></span>
-                </div>
-                <div class="user-avatar">VK</div>
+    <div class="app-header">
+        <div class="brand-section">
+            <div class="brand-icon">🧾</div>
+            <div>
+                <h1 class="brand-title">LedgerAI</h1>
+                <div class="brand-subtitle">Commercial Invoice & Receipt OCR Engine</div>
             </div>
         </div>
-        <div class="greeting-bar">
-            <div class="greeting-text">
-                <h2>Good morning, Vedant!</h2>
-                <p>Track, extract, and audit your commercial invoices in real-time</p>
-            </div>
-            <div style="display:flex; align-items:center; gap:1rem;">
-                <div style="color:#94A3B8; font-size:0.85rem; font-weight:500;">
-                    📅 {today_str}
-                </div>
-            </div>
+        <div class="header-badges">
+            <span class="badge-pill status">● API Connected</span>
+            <span class="badge-pill model">🤖 Gemini 2.5 Flash</span>
+            <span style="font-size:0.8rem; color:#64748B; margin-left:0.5rem;">{today_str}</span>
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# ── COMPUTE STATS FOR METRIC CARDS ─────────────────────────────────────────────
-history = st.session_state["history"]
-total_revenue = sum(h["total"] for h in history)
-total_invoices = len(history)
-valid_count = sum(1 for h in history if h["status"] == "Valid")
-flagged_count = total_invoices - valid_count
+# ── 2-COLUMN WORKBENCH LAYOUT ─────────────────────────────────────────────────
+left_col, right_col = st.columns([1.1, 1.9], gap="large")
 
-# ── METRIC CARDS ROW (4 CARDS) ─────────────────────────────────────────────────
-c1, c2, c3, c4 = st.columns([1.1, 1, 1, 1])
-
-with c1:
-    st.markdown(
-        f"""
-        <div class="metric-card highlight">
-            <div class="metric-title">Total Revenue</div>
-            <div class="metric-num">${total_revenue:,.2f}</div>
-            <span class="metric-pill positive">↗ +2.81% from last month</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with c2:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-title">Total Invoices</div>
-            <div class="metric-num">{total_invoices}</div>
-            <span class="metric-pill positive">↗ +5.90% from last month</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with c3:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-title">Validated Clean</div>
-            <div class="metric-num">{valid_count}</div>
-            <span class="metric-pill positive">✔ 100% Math match</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with c4:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-title">Pending / Flagged</div>
-            <div class="metric-num">{flagged_count}</div>
-            <span class="metric-pill negative">⚠ {flagged_count} flagged issues</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
-
-# ── MAIN LAYOUT: LEFT COLUMN (DATA & UPLOAD) + RIGHT COLUMN (ANALYTICS) ────────
-left_col, right_col = st.columns([2.1, 1])
-
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEFT COLUMN: UPLOAD & INPUT BILL PREVIEW
+# ═══════════════════════════════════════════════════════════════════════════════
 with left_col:
-    # ── Upload Card ────────────────────────────────────────────────────────────
     st.markdown(
         """
-        <div class="content-panel">
-            <div class="panel-header">
-                <div>
-                    <h3 class="panel-title">Upload & Extract Invoice</h3>
-                    <div class="panel-subtitle">Upload any bill image (JPG, PNG) or multi-page PDF to extract structured data</div>
-                </div>
-            </div>
+        <div class="card-panel">
+            <div class="card-title">📤 Upload Invoice Document</div>
+            <div class="card-desc">Supported: JPG, PNG, WEBP, multi-page PDF</div>
         """,
         unsafe_allow_html=True,
     )
 
     uploaded_file = st.file_uploader(
-        label="Drag & drop bill here",
+        label="Drop file here",
         type=["jpg", "jpeg", "png", "webp", "bmp", "pdf"],
-        help="Supported formats: JPG, PNG, WEBP, BMP, PDF",
+        help="Upload photo or scan of a bill",
         label_visibility="collapsed",
     )
 
     if uploaded_file:
-        up_c1, up_c2 = st.columns([1, 2])
-        with up_c1:
-            if uploaded_file.type != "application/pdf":
-                st.image(uploaded_file, caption=uploaded_file.name, use_container_width=True)
-            else:
-                st.markdown(
-                    f"""
-                    <div style="text-align:center; padding:1.5rem; background:#F8FAFC; border-radius:12px; border:1px solid #E2E8F0;">
-                        <div style="font-size:2.5rem;">📄</div>
-                        <div style="font-size:0.8rem; font-weight:600; color:#475569; margin-top:0.4rem;">{uploaded_file.name}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-        with up_c2:
+        st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
+        if uploaded_file.type != "application/pdf":
+            st.image(uploaded_file, caption=f"{uploaded_file.name} ({uploaded_file.size / 1024:.1f} KB)", use_container_width=True)
+        else:
             st.markdown(
                 f"""
-                <div style="padding:0.5rem 0;">
-                    <div style="font-size:0.85rem; color:#64748B;">File Name: <strong style="color:#0F172A;">{uploaded_file.name}</strong></div>
-                    <div style="font-size:0.85rem; color:#64748B; margin-top:0.2rem;">File Size: <strong style="color:#0F172A;">{uploaded_file.size / 1024:.1f} KB</strong></div>
-                    <div style="font-size:0.85rem; color:#64748B; margin-top:0.2rem;">Format: <strong style="color:#0F172A;">{uploaded_file.type}</strong></div>
+                <div style="text-align:center; padding:1.8rem; background:#080C14; border:1px solid #1E293B; border-radius:14px; margin-bottom:1rem;">
+                    <div style="font-size:2.8rem;">📄</div>
+                    <div style="font-size:0.9rem; font-weight:700; color:#F8FAFC; margin-top:0.4rem;">{uploaded_file.name}</div>
+                    <div style="font-size:0.75rem; color:#64748B;">{uploaded_file.size / 1024:.1f} KB • Portable Document Format</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-            extract_btn = st.button("🚀 Run OCR & AI Extraction", use_container_width=True, type="primary")
+
+        extract_btn = st.button("⚡ Extract & Verify Bill", use_container_width=True, type="primary")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Handle Extraction Action ───────────────────────────────────────────────
-    if uploaded_file and 'extract_btn' in locals() and extract_btn:
-        with st.spinner("⚡ Running OCR and Gemini 2.5 Flash extraction…"):
-            try:
-                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                response = httpx.post(f"{API_BASE}/extract", files=files, timeout=120)
-                response.raise_for_status()
-                result = response.json()
-                st.session_state["result"] = result
-
-                # Add to history if not already present
-                new_entry = {
-                    "vendor": result.get("vendor") or "Unknown Vendor",
-                    "date": result.get("date") or str(datetime.date.today()),
-                    "total": float(result.get("total") or 0.0),
-                    "status": "Valid" if result.get("is_valid") else "Flagged",
-                    "items_count": len(result.get("items") or []),
-                }
-                st.session_state["history"].insert(0, new_entry)
-                st.rerun()
-
-            except httpx.HTTPStatusError as e:
-                detail = e.response.json().get("detail", str(e))
-                st.error(f"❌ Extraction API Error: {detail}")
-            except Exception as e:
-                st.error(f"❌ Connection error: {e}")
-
-    # ── Current Extracted Result Panel ─────────────────────────────────────────
-    if "result" in st.session_state:
-        res = st.session_state["result"]
-        res_id = res["id"]
-
-        is_valid = res.get("is_valid", False)
-        badge_class = "booked" if is_valid else "flagged"
-        badge_text = "✔ Totals Validated" if is_valid else "⚠ Mismatch Detected"
-
-        st.markdown(
-            f"""
-            <div class="content-panel">
-                <div class="panel-header">
-                    <div>
-                        <h3 class="panel-title">Extracted Bill Details</h3>
-                        <div class="panel-subtitle">Vendor: <strong>{res.get('vendor') or 'N/A'}</strong> • Date: <strong>{res.get('date') or 'N/A'}</strong> • Invoice #: <strong>{res.get('invoice_number') or 'N/A'}</strong></div>
-                    </div>
-                    <div>
-                        <span class="status-badge {badge_class}">{badge_text}</span>
-                    </div>
-                </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        if res.get("validation_notes"):
-            for note in res["validation_notes"]:
-                st.warning(f"⚠️ {note}")
-
-        # Items Table
-        items = res.get("items", [])
-        if items:
-            df = pd.DataFrame(items)
-            df.columns = [c.replace("_", " ").title() for c in df.columns]
-            for col in ["Unit Price", "Line Total"]:
-                if col in df.columns:
-                    df[col] = df[col].apply(lambda x: f"${x:,.2f}" if pd.notna(x) else "—")
-            st.dataframe(df, use_container_width=True, hide_index=True)
-
-        # Totals Summary Bar
-        sub = res.get("subtotal")
-        tax = res.get("tax")
-        tot = res.get("total")
-
-        sum_c1, sum_c2, sum_c3 = st.columns(3)
-        with sum_c1:
-            st.metric("Subtotal", f"${sub:,.2f}" if sub is not None else "—")
-        with sum_c2:
-            st.metric("Tax", f"${tax:,.2f}" if tax is not None else "—")
-        with sum_c3:
-            st.metric("Grand Total", f"${tot:,.2f}" if tot is not None else "—")
-
-        # Download Buttons
-        st.markdown("<div style='height: 0.8rem;'></div>", unsafe_allow_html=True)
-        dl_c1, dl_c2 = st.columns(2)
-        with dl_c1:
-            try:
-                csv_resp = httpx.get(f"{API_BASE}/download/{res_id}/csv", timeout=30)
-                st.download_button(
-                    label="📄 Download Clean CSV",
-                    data=csv_resp.content,
-                    file_name=f"invoice_{res_id[:8]}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                )
-            except Exception as e:
-                st.error(f"CSV download error: {e}")
-
-        with dl_c2:
-            try:
-                xlsx_resp = httpx.get(f"{API_BASE}/download/{res_id}/excel", timeout=30)
-                st.download_button(
-                    label="📊 Download Formatted Excel",
-                    data=xlsx_resp.content,
-                    file_name=f"invoice_{res_id[:8]}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                )
-            except Exception as e:
-                st.error(f"Excel download error: {e}")
-
-        with st.expander("🔍 View Raw OCR Extracted Text"):
-            st.code(res.get("raw_text_preview", "(empty)"), language=None)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── Recent Invoices Table (Like "Recent booking list") ─────────────────────
+    # ── How it works card ──────────────────────────────────────────────────────
     st.markdown(
         """
-        <div class="content-panel">
-            <div class="panel-header">
-                <div>
-                    <h3 class="panel-title">Recent Invoices</h3>
-                    <div class="panel-subtitle">History of all extracted bills and verification statuses</div>
-                </div>
-                <div>
-                    <span style="font-size:0.8rem; font-weight:600; color:#64748B; background:#F1F5F9; padding:0.3rem 0.8rem; border-radius:9999px;">Today ▼</span>
-                </div>
-            </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    rec_df = pd.DataFrame(st.session_state["history"])
-    if not rec_df.empty:
-        rec_df_display = rec_df.copy()
-        rec_df_display.columns = ["Vendor Name", "Date", "Total Amount", "Audit Status", "Items Count"]
-        rec_df_display["Total Amount"] = rec_df_display["Total Amount"].apply(lambda x: f"${x:,.2f}")
-        st.dataframe(rec_df_display, use_container_width=True, hide_index=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ── RIGHT COLUMN (CHARTS & ANALYTICS WIDGETS) ──────────────────────────────────
-with right_col:
-    # ── Card 1: Monthly / Weekly Volume Bar Chart ──────────────────────────────
-    st.markdown(
-        """
-        <div class="content-panel">
-            <div class="panel-header" style="margin-bottom:0.5rem;">
-                <div>
-                    <h4 class="panel-title" style="font-size:1rem;">Invoice Volume</h4>
-                    <div class="panel-subtitle">Monthly extractions & spend</div>
-                </div>
-            </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    chart_data = pd.DataFrame({
-        "Month": ["Oct", "Nov", "Dec", "Jan"],
-        "Count": [202, 137, 367, 169]
-    })
-
-    bar_chart = (
-        alt.Chart(chart_data)
-        .mark_bar(cornerRadiusTopLeft=8, cornerRadiusTopRight=8, color="#0B132B")
-        .encode(
-            x=alt.X("Month:N", sort=None, axis=alt.Axis(labelAngle=0, labelColor="#64748B", tickColor="transparent")),
-            y=alt.Y("Count:Q", axis=alt.Axis(gridColor="#F1F5F9", labelColor="#64748B")),
-            tooltip=["Month", "Count"]
-        )
-        .properties(height=180)
-    )
-    st.altair_chart(bar_chart, use_container_width=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── Card 2: Spend Category Donut Chart ──────────────────────────────────────
-    st.markdown(
-        """
-        <div class="content-panel">
-            <div class="panel-header" style="margin-bottom:0.5rem;">
-                <div>
-                    <h4 class="panel-title" style="font-size:1rem;">Spend Categories</h4>
-                    <div class="panel-subtitle">Most billed expenses overview</div>
-                </div>
-                <div>
-                    <span style="font-size:0.75rem; color:#64748B; background:#F8FAFC; padding:0.2rem 0.5rem; border-radius:6px; border:1px solid #E2E8F0;">Weekly ▼</span>
-                </div>
-            </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    cat_data = pd.DataFrame({
-        "Category": ["Equipment", "Supplies", "Services", "Travel"],
-        "Share": [56, 25, 12, 7]
-    })
-
-    donut_chart = (
-        alt.Chart(cat_data)
-        .mark_arc(innerRadius=45, outerRadius=75)
-        .encode(
-            theta=alt.Theta("Share:Q"),
-            color=alt.Color(
-                "Category:N",
-                scale=alt.Scale(
-                    domain=["Equipment", "Supplies", "Services", "Travel"],
-                    range=["#0B132B", "#F59E0B", "#10B981", "#8B5CF6"]
-                ),
-                legend=alt.Legend(orient="bottom", columns=2, labelColor="#64748B")
-            ),
-            tooltip=["Category", "Share"]
-        )
-        .properties(height=210)
-    )
-    st.altair_chart(donut_chart, use_container_width=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── Card 3: Quick System Status ───────────────────────────────────────────
-    st.markdown(
-        """
-        <div class="content-panel">
-            <div class="panel-header" style="margin-bottom:0.5rem;">
-                <h4 class="panel-title" style="font-size:0.95rem;">Engine Health</h4>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; font-size:0.83rem;">
-                <span style="color:#64748B;">OCR Engine (EasyOCR)</span>
-                <span class="status-badge booked">Active</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; font-size:0.83rem;">
-                <span style="color:#64748B;">LLM (Gemini 2.5 Flash)</span>
-                <span class="status-badge booked">Connected</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.83rem;">
-                <span style="color:#64748B;">Audit Validator</span>
-                <span class="status-badge booked">Enforced</span>
+        <div class="card-panel" style="padding:1.3rem;">
+            <div class="card-title" style="font-size:0.92rem;">🛡️ Validation Architecture</div>
+            <div style="font-size:0.8rem; color:#64748B; line-height:1.6; margin-top:0.5rem;">
+                <div style="margin-bottom:0.4rem;"><strong style="color:#94A3B8;">1. Local OCR:</strong> EasyOCR reads text directly without sending raw images to third parties.</div>
+                <div style="margin-bottom:0.4rem;"><strong style="color:#94A3B8;">2. Structured LLM:</strong> OpenRouter converts unformatted text into typed JSON schema.</div>
+                <div><strong style="color:#94A3B8;">3. Math Audit:</strong> Line totals are independently summed and cross-checked against grand total to eliminate hallucination.</div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# EXECUTION LOGIC (Triggered on click)
+# ═══════════════════════════════════════════════════════════════════════════════
+if uploaded_file and 'extract_btn' in locals() and extract_btn:
+    with st.spinner("🔍 Running EasyOCR text detection & Gemini 2.5 Flash schema extraction…"):
+        try:
+            files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+            response = httpx.post(f"{API_BASE}/extract", files=files, timeout=120)
+            response.raise_for_status()
+            st.session_state["result"] = response.json()
+            st.rerun()
+        except httpx.HTTPStatusError as e:
+            detail = e.response.json().get("detail", str(e))
+            st.error(f"❌ Extraction API Error: {detail}")
+        except Exception as e:
+            st.error(f"❌ Connection error: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RIGHT COLUMN: EXTRACTED DATA, METRICS, TABLE, & DOWNLOADS
+# ═══════════════════════════════════════════════════════════════════════════════
+with right_col:
+    if "result" in st.session_state:
+        res = st.session_state["result"]
+        res_id = res["id"]
+        is_valid = res.get("is_valid", False)
+
+        st.markdown(
+            """
+            <div class="card-panel">
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # ── 1. Validation Banner ───────────────────────────────────────────────
+        if is_valid:
+            st.markdown(
+                """
+                <div class="validation-badge-banner valid">
+                    <span>✔ ARITHMETIC AUDIT PASSED</span>
+                    <span style="font-size:0.75rem; background:rgba(16,185,129,0.2); padding:0.2rem 0.6rem; border-radius:9999px;">Line sums match grand total</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """
+                <div class="validation-badge-banner flagged">
+                    <span>⚠ CALCULATION MISMATCH DETECTED</span>
+                    <span style="font-size:0.75rem; background:rgba(239,68,68,0.2); padding:0.2rem 0.6rem; border-radius:9999px;">Manual check recommended</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        if res.get("validation_notes"):
+            for note in res["validation_notes"]:
+                st.warning(f"⚠️ {note}")
+
+        # ── 2. Four Key Header Metrics ─────────────────────────────────────────
+        vendor_name = res.get("vendor") or "Unknown Vendor"
+        inv_date = res.get("date") or "—"
+        inv_num = res.get("invoice_number") or "—"
+        grand_total = res.get("total")
+        total_str = f"${grand_total:,.2f}" if grand_total is not None else "—"
+
+        st.markdown(
+            f"""
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-label">Vendor</div>
+                    <div class="metric-val">{vendor_name}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Date</div>
+                    <div class="metric-val blue">{inv_date}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Invoice #</div>
+                    <div class="metric-val">{inv_num}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Grand Total</div>
+                    <div class="metric-val green">{total_str}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # ── 3. Line Items Clean HTML Table ─────────────────────────────────────
+        st.markdown("<div class='card-title'>📋 Itemized Charges</div>", unsafe_allow_html=True)
+
+        items = res.get("items", [])
+        if items:
+            table_rows_html = ""
+            for item in items:
+                desc = item.get("description") or "—"
+                qty = item.get("qty")
+                qty_str = f"{qty:g}" if qty is not None else "—"
+                unit_price = item.get("unit_price")
+                unit_str = f"${unit_price:,.2f}" if unit_price is not None else "—"
+                line_total = item.get("line_total")
+                line_str = f"${line_total:,.2f}" if line_total is not None else "—"
+
+                table_rows_html += f"""
+                <tr>
+                    <td class="bold">{desc}</td>
+                    <td class="num">{qty_str}</td>
+                    <td class="num">{unit_str}</td>
+                    <td class="num bold" style="color:#38BDF8;">{line_str}</td>
+                </tr>
+                """
+
+            st.markdown(
+                f"""
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th style="width:50%;">Description</th>
+                            <th class="num" style="width:14%;">Qty</th>
+                            <th class="num" style="width:18%;">Unit Price</th>
+                            <th class="num" style="width:18%;">Line Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {table_rows_html}
+                    </tbody>
+                </table>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("No individual line items detected in this document.")
+
+        # ── 4. Subtotal, Tax, and Final Balances ────────────────────────────────
+        sub = res.get("subtotal")
+        tax = res.get("tax")
+        sub_str = f"${sub:,.2f}" if sub is not None else "—"
+        tax_str = f"${tax:,.2f}" if tax is not None else "—"
+
+        st.markdown(
+            f"""
+            <div style="display:flex; justify-content:flex-end; gap:2rem; padding:0.8rem 1.1rem; background:#141D32; border-radius:12px; border:1px solid #1E2D4A; margin-bottom:1.5rem; align-items:center;">
+                <div style="font-size:0.85rem; color:#94A3B8;">Subtotal: <strong style="color:#F8FAFC; margin-left:0.3rem;">{sub_str}</strong></div>
+                <div style="font-size:0.85rem; color:#94A3B8;">Tax: <strong style="color:#F8FAFC; margin-left:0.3rem;">{tax_str}</strong></div>
+                <div style="font-size:1.1rem; color:#F8FAFC; font-weight:700;">Grand Total: <span style="color:#10B981; margin-left:0.4rem;">{total_str}</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # ── 5. Action Bar: Downloads ───────────────────────────────────────────
+        st.markdown("<div class='card-title' style='font-size:0.95rem;'>📥 Export Clean Data</div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:0.3rem;'></div>", unsafe_allow_html=True)
+
+        dl1, dl2 = st.columns(2)
+        with dl1:
+            try:
+                csv_bytes = httpx.get(f"{API_BASE}/download/{res_id}/csv", timeout=30).content
+                st.download_button(
+                    label="📄 Export to CSV",
+                    data=csv_bytes,
+                    file_name=f"invoice_{res_id[:8]}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"CSV error: {e}")
+
+        with dl2:
+            try:
+                xlsx_bytes = httpx.get(f"{API_BASE}/download/{res_id}/excel", timeout=30).content
+                st.download_button(
+                    label="📊 Export to Excel (.xlsx)",
+                    data=xlsx_bytes,
+                    file_name=f"invoice_{res_id[:8]}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"Excel error: {e}")
+
+        # ── 6. Raw OCR Text Inspection Drawer ──────────────────────────────────
+        st.markdown("<div style='height:0.8rem;'></div>", unsafe_allow_html=True)
+        with st.expander("🔍 Inspect Raw OCR Extracted Text (Debug)"):
+            st.code(res.get("raw_text_preview", "(empty)"), language=None)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    else:
+        # Placeholder Empty State when no bill has been uploaded yet
+        st.markdown(
+            """
+            <div class="card-panel" style="text-align:center; padding:4rem 2rem;">
+                <div style="font-size:3.5rem; margin-bottom:1rem;">⚡</div>
+                <h3 style="color:#F8FAFC; font-size:1.3rem; font-weight:700; margin-bottom:0.4rem;">No Invoice Loaded Yet</h3>
+                <p style="color:#64748B; font-size:0.88rem; max-width:440px; margin:0 auto 1.5rem auto;">
+                    Upload a receipt or invoice document on the left panel to trigger automatic OCR reading, LLM structured parsing, and math validation.
+                </p>
+                <div style="display:inline-flex; gap:1.5rem; color:#94A3B8; font-size:0.8rem; background:#141D32; padding:0.6rem 1.4rem; border-radius:9999px; border:1px solid #1E2D4A;">
+                    <span>✔ Instant Table Parsing</span>
+                    <span>✔ Arithmetic Hallucination Check</span>
+                    <span>✔ CSV & Excel Export</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown(
     """
-    <div style="text-align:center; color:#94A3B8; font-size:0.8rem; margin-top:2rem;">
-        BillExtract AI Platform • Powered by EasyOCR & OpenRouter • Designed for Enterprise Operations
+    <div style="text-align:center; color:#475569; font-size:0.78rem; margin-top:2rem;">
+        LedgerAI Invoice Extractor • Built with FastAPI, EasyOCR, OpenRouter & Streamlit
     </div>
     """,
     unsafe_allow_html=True,
