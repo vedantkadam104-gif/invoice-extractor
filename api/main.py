@@ -34,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Invoice Extractor API",
+    title="QuickInvoice AI API",
     description="Upload a bill image or PDF and get back clean, validated JSON data.",
     version="1.0.0",
 )

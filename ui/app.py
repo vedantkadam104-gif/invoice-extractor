@@ -20,8 +20,8 @@ API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # ── Page Configuration ────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="LedgerAI — Invoice Extractor",
-    page_icon="🧾",
+    page_title="QuickInvoice AI — Invoice Extractor",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -318,9 +318,9 @@ st.markdown(
     f"""
     <div class="app-header">
         <div class="brand-section">
-            <div class="brand-icon">🧾</div>
+            <div class="brand-icon">⚡</div>
             <div>
-                <h1 class="brand-title">LedgerAI</h1>
+                <h1 class="brand-title">QuickInvoice AI</h1>
                 <div class="brand-subtitle">Commercial Invoice & Receipt OCR Engine</div>
             </div>
         </div>
@@ -606,7 +606,7 @@ with right_col:
 st.markdown(
     """
     <div style="text-align:center; color:#475569; font-size:0.78rem; margin-top:2rem;">
-        LedgerAI Invoice Extractor • Built with FastAPI, EasyOCR, OpenRouter & Streamlit
+        QuickInvoice AI • Built with FastAPI, EasyOCR, OpenRouter & Streamlit
     </div>
     """,
     unsafe_allow_html=True,

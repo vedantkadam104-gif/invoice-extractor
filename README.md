@@ -1,4 +1,4 @@
-# 🧾 Invoice / Bill Data Extractor
+# ⚡ QuickInvoice AI — Smart Invoice & Bill Data Extractor
 
 Upload a photo or PDF of any bill and get back clean, validated JSON — plus a CSV or Excel file — in seconds.
 
